@@ -159,6 +159,36 @@ else:
 xrt.close()
 ```
 
+**5. Register a callback for new data**
+```python
+import time
+import xrobotoolkit_sdk as xrt
+
+
+def on_frame(snapshot):
+    print("timestamp_ns:", snapshot["timestamp_ns"])
+    print("body_available:", snapshot["body"]["available"])
+    print("headset_pose:", snapshot["headset_pose"])
+
+
+xrt.init()
+xrt.register_frame_callback(on_frame)
+
+try:
+    while True:
+        time.sleep(1.0)
+finally:
+    xrt.clear_frame_callback()
+    xrt.close()
+```
+
+The callback is invoked whenever the SDK receives a new `PXREADeviceStateJson` update.
+
+Notes:
+- The callback receives a single snapshot `dict` containing the current cached controller, headset, hand, body, and motion-tracker state.
+- The callback runs on the SDK callback thread, so it should return quickly and avoid long blocking work.
+- If your callback raises an exception, it is reported as an unraisable Python exception and the SDK keeps running.
+
 **Body Joint Indices (24 joints total):**
 - 0: Pelvis, 1: Left Hip, 2: Right Hip, 3: Spine1, 4: Left Knee, 5: Right Knee
 - 6: Spine2, 7: Left Ankle, 8: Right Ankle, 9: Spine3, 10: Left Foot, 11: Right Foot
