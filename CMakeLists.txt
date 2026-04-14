@@ -9,22 +9,34 @@ cmake_host_system_information(RESULT ISA_NAME QUERY OS_PLATFORM) # Added: Import
 message(STATUS "OS_PLATFORM (ISA_NAME): ${ISA_NAME}")
 
 include(GNUInstallDirs) # Add this line
-find_package(pybind11 REQUIRED)
+find_package(pybind11 CONFIG REQUIRED)
+
+set(PXREA_SDK_LIBRARY "" CACHE FILEPATH "Absolute path to libPXREARobotSDK shared library")
+if(NOT PXREA_SDK_LIBRARY)
+  if(WIN32)
+    set(PXREA_SDK_LIBRARY "${PROJECT_SOURCE_DIR}/lib/PXREARobotSDK.dll")
+  elseif(ISA_NAME STREQUAL "aarch64")
+    set(PXREA_SDK_LIBRARY "${PROJECT_SOURCE_DIR}/lib/aarch64/libPXREARobotSDK.so")
+  else()
+    set(PXREA_SDK_LIBRARY "${PROJECT_SOURCE_DIR}/lib/libPXREARobotSDK.so")
+  endif()
+endif()
+
+if(NOT EXISTS "${PXREA_SDK_LIBRARY}")
+  message(FATAL_ERROR "PXREA_SDK_LIBRARY does not exist: ${PXREA_SDK_LIBRARY}")
+endif()
 
 # Python Bindings for py_bindings.cpp
 pybind11_add_module(xrobotoolkit_sdk MODULE bindings/py_bindings.cpp)
 
 # Link xrobotoolkit_sdk module against pybind11
 target_link_libraries(xrobotoolkit_sdk PRIVATE pybind11::module)
+target_include_directories(xrobotoolkit_sdk PUBLIC ${PROJECT_SOURCE_DIR}/include)
 
 # Add include directories and link libraries for PXREARobotSDK to xrobotoolkit_sdk target
 if(WIN32)
-  target_include_directories(xrobotoolkit_sdk PUBLIC
-      ${PROJECT_SOURCE_DIR}/include
-  )
-  target_link_directories(xrobotoolkit_sdk PUBLIC ${PROJECT_SOURCE_DIR}/lib)
   target_link_libraries(xrobotoolkit_sdk PUBLIC
-      PXREARobotSDK.dll # Assuming this is how PXREARobotSDK is linked, mirroring ConsoleDemo
+      "${PXREA_SDK_LIBRARY}" # Assuming this is how PXREARobotSDK is linked, mirroring ConsoleDemo
   )
 endif()
 
@@ -34,15 +46,15 @@ if(UNIX)
     target_include_directories(xrobotoolkit_sdk PUBLIC
         ${PROJECT_SOURCE_DIR}/include/aarch64
     )
-    target_link_directories(xrobotoolkit_sdk PUBLIC ${PROJECT_SOURCE_DIR}/lib/aarch64)
-  else()
-    target_include_directories(xrobotoolkit_sdk PUBLIC
-        ${PROJECT_SOURCE_DIR}/include
-    )
-    target_link_directories(xrobotoolkit_sdk PUBLIC ${PROJECT_SOURCE_DIR}/lib)
   endif()
   target_link_libraries(xrobotoolkit_sdk PUBLIC
-      PXREARobotSDK
+      "${PXREA_SDK_LIBRARY}"
+  )
+  set_target_properties(xrobotoolkit_sdk PROPERTIES
+      BUILD_WITH_INSTALL_RPATH TRUE
+      BUILD_RPATH "$ORIGIN"
+      INSTALL_RPATH "$ORIGIN"
+      INSTALL_RPATH_USE_LINK_PATH FALSE
   )
 endif()
 

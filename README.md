@@ -4,41 +4,46 @@ This project provides a python interface to extract XR state using XRoboToolkit-
 
 ## Requirements
 
-- [`pybind11`](https://github.com/pybind/pybind11)
 - [`XRoboRoolkit PC Service`](https://github.com/XR-Robotics/XRoboToolkit-PC-Service#)
+- CMake and a C++17 compiler
+- Python 3.10+
 
 ## Building the Project
 ### Ubuntu 22.04
 
-```
-conda remove --name xr --all
-conda create -n xr python=3.10
-conda activate xr
+The build no longer requires Conda. The recommended flow is:
 
-mkdir -p tmp
-cd tmp
-git clone https://github.com/XR-Robotics/XRoboToolkit-PC-Service.git
-cd XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK 
+- create or activate your target Python environment
+- clone `XRoboToolkit-PC-Service` next to this repo, or set `PXREA_SDK_ROOT`
+- build the native SDK
+- install this package with `python -m pip install .`
+
+`pybind11` is declared in `pyproject.toml`, so `pip` / `uv pip` will install the matching build dependency automatically.
+
+```
+python -m venv .venv
+source .venv/bin/activate
+
+git clone https://github.com/Axellwppr/XRoboToolkit-PC-Service-Pybind
+git clone --branch main --single-branch https://github.com/XR-Robotics/XRoboToolkit-PC-Service
+
+cd XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK
 bash build.sh
-cd ../../../..
 
-mkdir -p lib
-mkdir -p include
-cp tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/PXREARobotSDK.h include/
-cp -r tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/nlohmann include/nlohmann/
-cp tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/build/libPXREARobotSDK.so lib/
-# rm -rf tmp
-
-# Build the project
-conda install -c conda-forge pybind11
-
-pip uninstall -y xrobotoolkit_sdk
-python setup.py install
+cd ../../../../XRoboToolkit-PC-Service-Pybind
+python -m pip install .
 ```
+
+Alternatively, if the SDK repository lives elsewhere:
+
+```bash
+export PXREA_SDK_ROOT=/abs/path/to/XRoboToolkit-PC-Service
+python -m pip install .
+```
+
+The installed wheel bundles `libPXREARobotSDK.so` next to the Python extension and sets `RUNPATH=$ORIGIN`, so runtime import does not depend on the source checkout path.
 
 ### Windows
-
-**Ensure pybind11 is installed before running the following command.**
 
 ```
 setup_windows.bat

@@ -5,9 +5,54 @@ import shutil  # Added for shutil.rmtree
 import subprocess
 import sys
 from distutils.version import LooseVersion
+from pathlib import Path
 
+import pybind11
 from setuptools import Command, Extension, find_packages, setup  # Added Command
 from setuptools.command.build_ext import build_ext
+
+REPO_ROOT = Path(__file__).resolve().parent
+
+
+def _candidate_sdk_library_paths() -> list[Path]:
+    candidates: list[Path] = []
+
+    sdk_library = os.environ.get("PXREA_SDK_LIBRARY")
+    if sdk_library:
+        candidates.append(Path(sdk_library).expanduser())
+
+    sdk_root = os.environ.get("PXREA_SDK_ROOT")
+    if sdk_root:
+        sdk_root_path = Path(sdk_root).expanduser()
+        candidates.extend(
+            [
+                sdk_root_path / "libPXREARobotSDK.so",
+                sdk_root_path / "SDK" / "linux" / "64" / "libPXREARobotSDK.so",
+                sdk_root_path / "RoboticsService" / "SDK" / "linux" / "64" / "libPXREARobotSDK.so",
+            ]
+        )
+
+    candidates.extend(
+        [
+            REPO_ROOT / "lib" / "libPXREARobotSDK.so",
+            REPO_ROOT / ".." / "XRoboToolkit-PC-Service" / "RoboticsService" / "SDK" / "linux" / "64" / "libPXREARobotSDK.so",
+            REPO_ROOT / ".." / "XRoboToolkit-PC-Service" / "RoboticsService" / "PXREARobotSDK" / "build" / "libPXREARobotSDK.so",
+        ]
+    )
+    return candidates
+
+
+def _resolve_sdk_library() -> Path:
+    for candidate in _candidate_sdk_library_paths():
+        candidate = candidate.resolve()
+        if candidate.is_file():
+            return candidate
+    searched = "\n".join(f"  - {path}" for path in _candidate_sdk_library_paths())
+    raise RuntimeError(
+        "Could not find libPXREARobotSDK.so.\n"
+        "Set PXREA_SDK_LIBRARY or PXREA_SDK_ROOT, or clone XRoboToolkit-PC-Service next to this repo.\n"
+        f"Searched:\n{searched}"
+    )
 
 
 class CMakeExtension(Extension):
@@ -40,10 +85,17 @@ class CMakeBuild(build_ext):
         if not extdir.endswith(os.path.sep):
             extdir += os.path.sep
 
+        sdk_library = _resolve_sdk_library()
+        pybind11_dir = Path(pybind11.get_cmake_dir()).resolve()
+
         # Get pybind11 include paths
         cmake_args = [
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY=" + extdir,
             "-DPYTHON_EXECUTABLE=" + sys.executable,
+            "-DPython_EXECUTABLE=" + sys.executable,
+            "-DPYBIND11_FINDPYTHON=ON",
+            "-Dpybind11_DIR=" + str(pybind11_dir),
+            "-DPXREA_SDK_LIBRARY=" + str(sdk_library),
             "-DCMAKE_BUILD_TYPE=Release",
         ]
 
@@ -68,6 +120,7 @@ class CMakeBuild(build_ext):
 
         subprocess.check_call(["cmake", ext.sourcedir] + cmake_args, cwd=self.build_temp, env=env)
         subprocess.check_call(["cmake", "--build", "."] + build_args, cwd=self.build_temp)
+        shutil.copy2(sdk_library, os.path.join(extdir, sdk_library.name))
 
 
 # New Clean Command

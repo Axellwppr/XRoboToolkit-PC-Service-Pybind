@@ -1,27 +1,24 @@
-if [[ "$CONDA_DEFAULT_ENV" != "" ]]; then
-    conda install -c conda-forge libstdcxx-ng -y
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SDK_REPO_DIR=${PXREA_SDK_REPO_DIR:-"$ROOT_DIR/../XRoboToolkit-PC-Service"}
+PYTHON_BIN=${PYTHON_BIN:-python}
+
+if [[ ! -d "$SDK_REPO_DIR/.git" ]]; then
+    echo "Cloning XRoboToolkit-PC-Service into $SDK_REPO_DIR"
+    git clone --branch main --single-branch https://github.com/XR-Robotics/XRoboToolkit-PC-Service.git "$SDK_REPO_DIR"
 fi
 
-mkdir -p tmp
-cd tmp
-git clone https://github.com/XR-Robotics/XRoboToolkit-PC-Service.git
-cd XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK 
-bash build.sh
-cd ../../../..
+echo "Building PXREARobotSDK from $SDK_REPO_DIR"
+bash "$SDK_REPO_DIR/RoboticsService/PXREARobotSDK/build.sh"
 
-mkdir -p lib
-mkdir -p include
-cp tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/PXREARobotSDK.h include/
-cp -r tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/nlohmann include/nlohmann/
-cp tmp/XRoboToolkit-PC-Service/RoboticsService/PXREARobotSDK/build/libPXREARobotSDK.so lib/
-# rm -rf tmp
-
-# Build the project
-if [[ "$CONDA_DEFAULT_ENV" != "" ]]; then
-    conda install -c conda-forge pybind11 -y
+echo "Installing xrobotoolkit_sdk with $PYTHON_BIN"
+if "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+    "$PYTHON_BIN" -m pip install --force-reinstall "$ROOT_DIR"
+elif command -v uv >/dev/null 2>&1; then
+    uv pip install --python "$PYTHON_BIN" --force-reinstall "$ROOT_DIR"
 else
-    pip install pybind11 -y
+    echo "Neither '$PYTHON_BIN -m pip' nor 'uv pip' is available."
+    exit 1
 fi
-
-pip uninstall -y xrobotoolkit_sdk
-python setup.py install
